@@ -1,9 +1,9 @@
 ;;; pst-format.el --- view perl Storable files as human readable text
 
-;; Copyright 2008, 2009 Kevin Ryde
+;; Copyright 2008, 2009, 2010 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 4
+;; Version: 5
 ;; Keywords: data
 ;; URL: http://user42.tuxfamily.org/pst-format/index.html
 ;; EmacsWiki: PerlLanguage
@@ -71,6 +71,7 @@
 ;; Version 2 - cope with non-existent default-directory
 ;; Version 3 - hyperlink home page in the docstring
 ;; Version 4 - use pipe rather than pty for subprocess
+;; Version 5 - autoload the encode too, for an unload-feature while in use
 
 ;;; Emacsen:
 
@@ -114,9 +115,11 @@ BODY does."
                t     ;; encode modifies the region
                nil)) ;; write removes from buffer-file-formats
 
+;;;###autoload
 (defun pst-format-encode (beg end buffer)
+  ;; checkdoc-params: (beg end buffer)
   "Sorry, cannot re-encode Storable.
-This function is for use from `format-alist'.
+This function is designed for use in `format-alist'.
 
 There's no support as yet for writing back dumped Storable
 contents.  Simple stuff wouldn't be hard, but self-referential
@@ -202,8 +205,9 @@ you've got a very fast computer with lots of memory!")
 
 ;;;###autoload
 (defun pst-format-decode (beg end)
+  ;; checkdoc-params: (beg end)
   "Decode raw Storable bytes in the current buffer.
-This function is for use from `format-alist'.
+This function is designed for use in `format-alist'.
 
 The buffer can be either unibyte or multibyte, as long as any
 multibyte is reversible, so it writes out the original contents
