@@ -3,7 +3,7 @@
 ;; Copyright 2008, 2009, 2010 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 5
+;; Version: 6
 ;; Keywords: data
 ;; URL: http://user42.tuxfamily.org/pst-format/index.html
 ;; EmacsWiki: PerlLanguage
@@ -57,12 +57,15 @@
 ;; case-by-case basis.
 ;;
 ;; There's no major mode set for the final human readable text;
-;; pst-format.el is just a decode.  Since it's Data::Dumper output
+;; pst-format.el is just a decode.  Because it's Data::Dumper output either
 ;; `perl-mode' or `cperl-mode' are good and can be turned on from
-;; auto-mode-alist in the usual way
+;; `auto-mode-alist' in the usual way.  For example dh-make-perl's
+;; Contents.cache,
 ;;
+;;     (modify-coding-system-alist
+;;              'file "/\\.dh-make-perl/Contents\\.cache\\'" 'raw-text-unix)
 ;;     (add-to-list 'auto-mode-alist
-;;                  '(".*/.someprog/cache.file\\'" . cperl-mode))
+;;                  '("/\\.dh-make-perl/Contents\\.cache\\'" . cperl-mode))
 
 
 ;;; History:
@@ -72,6 +75,7 @@
 ;; Version 3 - hyperlink home page in the docstring
 ;; Version 4 - use pipe rather than pty for subprocess
 ;; Version 5 - autoload the encode too, for an unload-feature while in use
+;; Version 6 - kill the errors buffer when no errors
 
 ;;; Emacsen:
 
@@ -92,6 +96,7 @@
   "Create an `errorfile' for use by the BODY forms.
 An `unwind-protect' ensures the file is removed no matter what
 BODY does."
+  ;; (declare (debug t))  ;; emacs22,xemacs21, or 'cl
   `(let ((errorfile (pst-format-make-temp-file "pst-format-")))
      (unwind-protect
          (progn ,@body)
@@ -271,6 +276,10 @@ URL `http://user42.tuxfamily.org/pst-format/index.html'"
          (unless (eq 0 status)
            (switch-to-buffer "*pst-format-errors*")
            (error "Storable retrieve error, see *pst-format-errors* buffer"))
+
+         ;; discard when successful
+         (delete-windows-on "*pst-format-errors*")
+         (kill-buffer "*pst-format-errors*")
 
          (when unibyte-p
            (decode-coding-region (point-min) (point-max) read-coding)
