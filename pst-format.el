@@ -1,10 +1,10 @@
 ;;; pst-format.el --- view perl Storable files as human readable text
 
-;; Copyright 2008, 2009, 2010 Kevin Ryde
+;; Copyright 2008, 2009, 2010, 2011, 2013, 2014 Kevin Ryde
 
 ;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 6
-;; Keywords: data
+;; Version: 7
+;; Keywords: data, perl
 ;; URL: http://user42.tuxfamily.org/pst-format/index.html
 ;; EmacsWiki: PerlLanguage
 
@@ -23,7 +23,7 @@
 
 ;;; Commentary:
 
-;; This is a bit of fun turning perl "Storable" module binary data into
+;; This is a bit of fun turning Perl "Storable" module binary data into
 ;; something human readable, just with Data::Dumper.  There's no re-writing
 ;; as yet, it's only meant for browsing Storable files.
 
@@ -76,6 +76,7 @@
 ;; Version 4 - use pipe rather than pty for subprocess
 ;; Version 5 - autoload the encode too, for an unload-feature while in use
 ;; Version 6 - kill the errors buffer when no errors
+;; Version 7 - more make-temp-file fallbacks
 
 ;;; Emacsen:
 
@@ -84,13 +85,32 @@
 
 ;;; Code:
 
-;; xemacs lack
-(defalias 'pst-format-make-temp-file
-  (if (eval-when-compile (fboundp 'make-temp-file))
-      'make-temp-file   ;; emacs
-    ;; xemacs21
-    (autoload 'mm-make-temp-file "mm-util") ;; from gnus
-    'mm-make-temp-file))
+;;-----------------------------------------------------------------------------
+;; `make-temp-file' new in emacs21, not in xemacs21
+
+(cond ((or (eval-when-compile (fboundp 'make-temp-file))
+           (fboundp 'make-temp-file))
+       ;; emacs21 up, noticed at compile time or run time
+       (eval-and-compile
+         (defalias 'pst-format-make-temp-file 'make-temp-file)))
+
+      ((locate-library "mm-util") ;; from gnus
+       ;; xemacs21
+       (autoload 'mm-make-temp-file "mm-util")
+       (defalias 'pst-format-make-temp-file 'mm-make-temp-file))
+
+      ((locate-library "poe") ;; from APEL
+       ;; emacs20 with poe.el add-on
+       (require 'poe)
+       (defalias 'pst-format-make-temp-file 'make-temp-file))
+
+      (t
+       ;; umm, dunno, hope the user can define it
+       (message "perl-pod-preview.el: don't know where to get `make-temp-file'")
+       (defalias 'pst-format-make-temp-file 'make-temp-file)))
+
+
+;;-----------------------------------------------------------------------------
 
 (defmacro pst-format-with-errorfile (&rest body)
   "Create an `errorfile' for use by the BODY forms.
@@ -297,6 +317,9 @@ URL `http://user42.tuxfamily.org/pst-format/index.html'"
          (set-buffer-file-coding-system buffer-file-coding-system)
 
          (point-max))))))
+
+;;  LocalWords:  Storable stdin stdout ie utf ucs Sortkeys concats cpan
+;;  LocalWords:  Metadata
 
 (provide 'pst-format)
 
