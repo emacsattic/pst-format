@@ -1,9 +1,9 @@
 ;;; pst-format.el --- view perl Storable files as human readable text
 
-;; Copyright 2008, 2009, 2010, 2011, 2013, 2014 Kevin Ryde
+;; Copyright 2008, 2009, 2010, 2011, 2013, 2014, 2015 Kevin Ryde
 
-;; Author: Kevin Ryde <user42@zip.com.au>
-;; Version: 7
+;; Author: Kevin Ryde <user42_kevin@yahoo.com.au>
+;; Version: 8
 ;; Keywords: data, perl
 ;; URL: http://user42.tuxfamily.org/pst-format/index.html
 ;; EmacsWiki: PerlLanguage
@@ -23,9 +23,9 @@
 
 ;;; Commentary:
 
-;; This is a bit of fun turning Perl "Storable" module binary data into
-;; something human readable, just with Data::Dumper.  There's no re-writing
-;; as yet, it's only meant for browsing Storable files.
+;; This is a bit of fun turning Perl "Storable" module binary data using
+;; Data::Dumper.  There's no re-writing of a Storable file, it's only meant
+;; for looking at the contents in a roughly human readable form.
 
 ;;; Install:
 
@@ -47,25 +47,25 @@
 ;;                    t
 ;;                    nil))
 ;;
-;; There's autoload cookies below for this latter style, if you know how to
-;; use `update-file-autoloads' and friends.
+;; There's autoload cookies for this latter, if you install via
+;; `M-x package-install' or know how to use `update-file-autoloads'.
 ;;
-;; Storable files are basically binary but the code here should cope with
-;; either a unibyte like `raw-text-unix' or some reversible multibyte.
-;; There's no conventional filename suffix for Storable, it's just whatever
-;; a given program makes up, so if you set a coding system it'd be on a
+;; Storable files are binary but the code here should cope with either a
+;; unibyte like `raw-text-unix' or some reversible multibyte.  There's no
+;; conventional filename suffix for Storable, it's just whatever a given
+;; program invents, so if you set a coding system it will be on a
 ;; case-by-case basis.
 ;;
 ;; There's no major mode set for the final human readable text;
 ;; pst-format.el is just a decode.  Because it's Data::Dumper output either
 ;; `perl-mode' or `cperl-mode' are good and can be turned on from
-;; `auto-mode-alist' in the usual way.  For example dh-make-perl's
+;; `auto-mode-alist' in the usual way.  For example Debian dh-make-perl's
 ;; Contents.cache,
 ;;
 ;;     (modify-coding-system-alist
-;;              'file "/\\.dh-make-perl/Contents\\.cache\\'" 'raw-text-unix)
+;;         'file "/\\.dh-make-perl/Contents\\.cache\\'" 'raw-text-unix)
 ;;     (add-to-list 'auto-mode-alist
-;;                  '("/\\.dh-make-perl/Contents\\.cache\\'" . cperl-mode))
+;;             '("/\\.dh-make-perl/Contents\\.cache\\'" . cperl-mode))
 
 
 ;;; History:
@@ -77,6 +77,7 @@
 ;; Version 5 - autoload the encode too, for an unload-feature while in use
 ;; Version 6 - kill the errors buffer when no errors
 ;; Version 7 - more make-temp-file fallbacks
+;; Version 8 - errorfile macro not needed after byte compiling
 
 ;;; Emacsen:
 
@@ -112,15 +113,19 @@
 
 ;;-----------------------------------------------------------------------------
 
-(defmacro pst-format-with-errorfile (&rest body)
-  "Create an `errorfile' for use by the BODY forms.
+(eval-when-compile
+  (defmacro pst-format-with-errorfile (&rest body)
+    "An internal part of pst-format.el.
+This macro doesn't exist when running byte compiled.
+
+Create an `errorfile' for use by the BODY forms.
 An `unwind-protect' ensures the file is removed no matter what
 BODY does."
-  ;; (declare (debug t))  ;; emacs22,xemacs21, or 'cl
-  `(let ((errorfile (pst-format-make-temp-file "pst-format-")))
-     (unwind-protect
-         (progn ,@body)
-       (delete-file errorfile))))
+    ;; (declare (debug t))  ;; emacs22,xemacs21, or 'cl
+    `(let ((errorfile (pst-format-make-temp-file "pst-format-")))
+       (unwind-protect
+           (progn ,@body)
+         (delete-file errorfile)))))
 
 ;;;###autoload
 (add-to-list 'format-alist
@@ -166,16 +171,17 @@ $Data::Dumper::Sortkeys = 1;
 $Data::Dumper::Useqq    = 1;
 $Data::Dumper::Indent   = 1;
 
-# This is a moderately nasty hack to make Dumper print utf-8 for
-# strings marked as utf-8.  Control chars in such strings get
-# \\x{00} escapes.  Non-utf8 strings get Dumper's normal
-# action (octal).  There's no way to know what, if any encoding,
-# those non-utf8 strings might be, so escapes are safest.
+# This is a moderately nasty hack to make Dumper print \\x{00}
+# escapes for control chars other than tabs and newlines in wide
+# char strings.  Byte strings get Dumper's normal action, which
+# is octal.  There's no way to know what, if any encoding, those
+# byte strings might be, so escapes are safest.
 #
 my $orig_qquote = \\&Data::Dumper::qquote;
 sub my_qquote {
   my ($str) = @_;
   if (utf8::is_utf8($str)) {
+    # leave \x09 tab and \x0A newline unchanged
     $str=~s/([\\x00-\\x08\\x0B-\\x1F\\x7F-\x9F])/sprintf('\\\\x{%02x}',ord($1))/ge;
     return '\"' . $str . '\"';
   } else {
@@ -185,7 +191,7 @@ sub my_qquote {
 
 # if emacs and perl both do utf-8 then generate that with
 # my_qquote(), otherwise leave it all to Dumper
-my $utf8 = ($ARGV[0] eq 'utf-8'          # emacs from command line
+my $utf8 = ($ARGV[0] eq 'utf-8'          # emacs, from command line
             && defined &utf8::is_utf8);  # new enough perl
 if ($utf8) {
   binmode (STDOUT, ':encoding(utf-8)') or die 'Oops, binmode error';
@@ -210,13 +216,13 @@ In principle you can change this for the dump options or dumper
 module you prefer, but it's a bit hairy.  The current
 implementation runs
 
-    perl -e PST-FORMAT-DECODE-COMMAND CODING
+    perl -e pst-format-decode-command CODING
 
-and it should read Storable from stdin and write human text to
-stdout.  The CODING argument, ie. $ARGV[0], is the Emacs read
-coding system.  It's either \"utf-8\" if that's possible (meaning
-Emacs 21 and up, or XEmacs 21 with mule-ucs), otherwise
-\"undecided\".  But don't rely on any of this.
+which reads Storable on stdin and writes human text to stdout.
+The CODING argument, ie. $ARGV[0], is the Emacs read coding
+system.  It's either \"utf-8\" if that's possible (meaning Emacs
+21 and up, or XEmacs 21 with mule-ucs), otherwise \"undecided\".
+But don't rely on any of this.
 
 $Data::Dumper::Sortkeys makes the output consistent.  You might
 wonder if keys should be shown in the order they appear in the
@@ -225,8 +231,8 @@ may as well sort for readability.
 
 Data::Dumper isn't blindingly fast on big files, for various
 reasons, including string concats and its work detecting circular
-structures.  So don't try it on say a huge .cpan/Metadata unless
-you've got a very fast computer with lots of memory!")
+structures.  So don't try it on a huge file like .cpan/Metadata
+unless you've got a very fast computer with lots of memory!")
 
 ;;;###autoload
 (defun pst-format-decode (beg end)
